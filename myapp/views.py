@@ -1,11 +1,9 @@
-from django.shortcuts import get_list_or_404
+from django.shortcuts import get_object_or_404
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from .models import *
-from .serializers import *
-
+from .models import Product, Order, OrderItem
+from .serializers import ProductSerializer, OrderSerializer, OrderItemSerializer
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.decorators import action
 
 class ProductViewSet(viewsets.ViewSet):
     def list(self, request):
@@ -14,18 +12,16 @@ class ProductViewSet(viewsets.ViewSet):
         return Response(serializer.data)
     
     def retrieve(self, request, pk=None):
-        queryset = Product.objects.all()
-        product = get_list_or_404(queryset, pk=pk)
+        product = get_object_or_404(Product, pk=pk)  # Corrected to get a single object
         serializer = ProductSerializer(product)
         return Response(serializer.data)
     
     def create(self, request):
-        serializer = ProductSerializer(data = request.data)
+        serializer = ProductSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
     def update(self, request, pk=None):
         product = Product.objects.get(pk=pk)
@@ -35,14 +31,14 @@ class ProductViewSet(viewsets.ViewSet):
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-
     def destroy(self, request, pk=None):
-        product = Product.object.get(pk=pk)
+        product = Product.objects.get(pk=pk)  # Corrected typo here
         product.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
     
     def get_permissions(self):
-        if self.action == 'list' or self.action == 'retrieve':
+        # AllowAny for 'list' and 'retrieve', IsAuthenticated for 'create', 'update', 'destroy'
+        if self.action in ['list', 'retrieve']:
             permission_classes = [AllowAny]
         else:
             permission_classes = [IsAuthenticated]
@@ -56,8 +52,7 @@ class OrderViewSet(viewsets.ViewSet):
         return Response(serializer.data)
     
     def retrieve(self, request, pk=None):
-        queryset = Order.objects.all()
-        order = get_list_or_404(queryset, pk=pk)
+        order = get_object_or_404(Order, pk=pk)  # Corrected to get a single object
         serializer = OrderSerializer(order)
         return Response(serializer.data)
     
@@ -70,7 +65,7 @@ class OrderViewSet(viewsets.ViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
     def get_permissions(self):
-        permission_classes = [IsAuthenticated]
+        permission_classes = [IsAuthenticated]  # All actions require authentication for Order
         return [permission() for permission in permission_classes]
     
 
@@ -81,8 +76,7 @@ class OrderItemViewSet(viewsets.ViewSet):
         return Response(serializer.data)
     
     def retrieve(self, request, pk=None):
-        queryset = OrderItem.objects.all()
-        orderitem = get_list_or_404(queryset, pk=pk)
+        orderitem = get_object_or_404(OrderItem, pk=pk)  # Corrected to get a single object
         serializer = OrderItemSerializer(orderitem)
         return Response(serializer.data)
     
@@ -95,5 +89,5 @@ class OrderItemViewSet(viewsets.ViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
     def get_permissions(self):
-        permission_classes = [IsAuthenticated]
+        permission_classes = [IsAuthenticated]  # All actions require authentication for OrderItem
         return [permission() for permission in permission_classes]
