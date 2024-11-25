@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from .models import Product, Order, OrderItem
 from .serializers import ProductSerializer, OrderSerializer, OrderItemSerializer
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.exceptions import ValidationError
 
 class ProductViewSet(viewsets.ViewSet):
     def list(self, request):
@@ -57,12 +58,28 @@ class OrderViewSet(viewsets.ViewSet):
         return Response(serializer.data)
     
     def create(self, request):
-        serializer = OrderSerializer(data=request.data)
+        items_data = request.data.pop('items', [])  # Extract nested items data
+        serializer = OrderSerializer(data=request.data, context={'request': request})
+
         if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            order = serializer.save()  # User is automatically set via serializer's create()
+            
+            # Create OrderItems associated with the order
+            for item_data in items_data:
+                try:
+                    product = Product.objects.get(id=item_data['product'])
+                    OrderItem.objects.create(order=order, product=product, quantity=item_data['quantity'])
+                except KeyError as e:
+                    order.delete()  # Rollback if items data is invalid
+                    return Response({'error': f'Missing field: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+                except Product.DoesNotExist:
+                    order.delete()  # Rollback if product doesn't exist
+                    return Response({'error': 'Product not found'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Return the created order
+            return Response(OrderSerializer(order, context={'request': request}).data, status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
     def get_permissions(self):
         permission_classes = [IsAuthenticated]  # All actions require authentication for Order

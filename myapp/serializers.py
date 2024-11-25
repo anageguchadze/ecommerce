@@ -18,3 +18,9 @@ class OrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = ['id', 'user', 'created_at', 'updated_at', 'items']
+        read_only_fields = ['user']  # Ensure 'user' is not required in input
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        order = Order.objects.create(user=user, **validated_data)
+        return order
